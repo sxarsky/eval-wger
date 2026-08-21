@@ -5,16 +5,6 @@ on:
     types: [opened, synchronize, reopened, closed]
   issue_comment:
     types: [created]
-  workflow_dispatch:
-    inputs:
-      wger-react_ref:
-        description: 'Git ref (branch, tag, or SHA) of mrugeshmaster/wger-react to analyze. Defaults to its default branch.'
-        required: false
-        type: string
-      wger-flutter_ref:
-        description: 'Git ref (branch, tag, or SHA) of mrugeshmaster/wger-flutter to analyze. Defaults to its default branch.'
-        required: false
-        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
@@ -22,85 +12,30 @@ concurrency:
 
 jobs:
   testbot:
-    # Only run for pull_request events or issue_comment on PRs mentioning @skyramp-testbot
     if: >-
       github.event_name == 'pull_request' ||
-      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@skyramp-testbot') && github.event.comment.user.login != 'skyramp-testbot[bot]')
     runs-on: 'ubuntu-latest'
     permissions:
       contents: write
       pull-requests: write
       checks: write
-
     steps:
-      - name: Generate GitHub App Token
-        id: skyramp-testbot-app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        with:
-          app-id: ${{ secrets.SKYRAMP_TESTBOT_APP_ID }}
-          private-key: ${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}
-          repositories: wger,wger-react,wger-flutter
-
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-          filter: blob:none
-          path: wger
-          token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
-
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        id: skyramp-checkout-wger-react
-        continue-on-error: true
+          submodules: recursive
+      - uses: skyramp/testbot@15b35b4f7fc705aa12e96bb0aa65e238738ccdb7 # v0.11.7
         with:
-          repository: mrugeshmaster/wger-react
-          path: wger-react
-          fetch-depth: 0
-          filter: blob:none
-          ref: ${{ inputs['wger-react_ref'] || github.head_ref || github.ref_name }}
-          token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
-
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        if: steps['skyramp-checkout-wger-react'].outcome == 'failure'
-        with:
-          repository: mrugeshmaster/wger-react
-          path: wger-react
-          fetch-depth: 0
-          filter: blob:none
-          token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
-
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        id: skyramp-checkout-wger-flutter
-        continue-on-error: true
-        with:
-          repository: mrugeshmaster/wger-flutter
-          path: wger-flutter
-          fetch-depth: 0
-          filter: blob:none
-          ref: ${{ inputs['wger-flutter_ref'] || github.head_ref || github.ref_name }}
-          token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
-
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        if: steps['skyramp-checkout-wger-flutter'].outcome == 'failure'
-        with:
-          repository: mrugeshmaster/wger-flutter
-          path: wger-flutter
-          fetch-depth: 0
-          filter: blob:none
-          token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
-
-      - uses: skyramp/testbot@d73b19920cf3d8df3b3287c8bd95d09fd997a3d1 # v0.10.6
-        with:
+          skyrampMcpVersion: "0.3.3"
+          skyrampExecutorVersion: "v1.3.39"
           skyrampLicenseFile: ${{ secrets.SKYRAMP_LICENSE_FILE }}
           anthropicApiKey: ${{ secrets.SKYRAMP_TESTBOT_API_KEY }}
-          githubToken: ${{ steps.skyramp-testbot-app-token.outputs.token }}
-          workingDirectory: 'wger'
-          targetSetupCommand: 'docker build -t wger/server:pr-build-intermediate -f ./extras/docker/production/Dockerfile . && npm --prefix ../wger-react ci && npm --prefix ../wger-react run build && npm pack ../wger-react --pack-destination . && docker build -t wger/server:pr-build -f ./.skyramp/sut/Dockerfile.testbot . && rm -f wger-project-react-components-*.tgz && docker compose -f ./.skyramp/sut/docker-compose.testbot.yml up -d'
-          targetReadyCheckCommand: 'curl -sf http://localhost/api/v2/version/'
-          targetReadyCheckTimeout: '900'
-          targetTeardownCommand: 'docker compose -f ./.skyramp/sut/docker-compose.testbot.yml down -v'
-          authTokenCommand: 'bash ./.skyramp/sut/get-token.sh'
-          skyrampMcpVersion: '0.2.150-rc.ui.mntnc'
-          relatedRepoPaths: |
-            ./wger-react
-            ./wger-flutter
+          githubAppId: ${{ secrets.SKYRAMP_TESTBOT_APP_ID }}
+          githubAppPrivateKey: ${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}
+          targetSetupCommand: >-
+            docker compose -f $GITHUB_WORKSPACE/docker-compose.eval.yml -p wger-eval up -d --wait --wait-timeout 900
+          targetTeardownCommand: 'docker compose -f $GITHUB_WORKSPACE/docker-compose.eval.yml -p wger-eval down -v'
+          authTokenCommand: 'bash $GITHUB_WORKSPACE/get-auth-token.sh'
+          authTokenRetries: "20"
+          authTokenRetryDelay: "15"

@@ -1,0 +1,123 @@
+#
+# Eval Dockerfile for wger — builds from source without relying on pre-built
+# wger/base or wger/server images. Adapted from pellepedro-testbot/wger-testb.
+#
+# start-services.sh copies this file to $REPO_PATH/Dockerfile.eval before
+# docker compose runs, so the build context can be the repo root.
+#
+
+##########
+# Builder
+##########
+FROM ubuntu:24.04 AS builder
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+  && apt-get install --no-install-recommends -y \
+      ca-certificates \
+      python3 \
+      python3-pip \
+      build-essential \
+      python3-dev \
+      python3-wheel \
+      pkg-config \
+      libcairo2-dev \
+      libjpeg8-dev \
+      libwebp-dev \
+      libpq-dev \
+      rustc \
+      cargo \
+      unzip \
+      wget \
+      curl \
+  && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+  && apt-get install --no-install-recommends -y nodejs \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* \
+  && mkdir -p /root/src/wger/core/static \
+  && wget -q https://bootstrap.pypa.io/get-pip.py \
+  && python3 get-pip.py --no-warn-script-location --break-system-packages --ignore-installed \
+  && rm get-pip.py
+
+WORKDIR /root/src
+
+# Install Python wheels
+COPY pyproject.toml README.md /root/src/
+COPY wger/version.py wger/__init__.py /root/src/wger/
+
+RUN pip3 wheel \
+      --no-cache-dir \
+      --wheel-dir /wheels \
+      --group docker . \
+  && npm install -g sass
+
+# Build JS/CSS
+COPY package.json package-lock.json ./
+COPY wger/core/static /root/src/wger/core/static
+RUN npm ci --production \
+  && npm run build:css:sass \
+  && PACKAGE_NAME="@wger-project/react-components" \
+  && PACKAGE_VERSION=$(node -p "require('./package.json').devDependencies['$PACKAGE_NAME']") \
+  && TARBALL=$(npm pack ${PACKAGE_NAME}@${PACKAGE_VERSION}) \
+  && mkdir -p node_modules/${PACKAGE_NAME} \
+  && tar -xzf ${TARBALL} -C node_modules/${PACKAGE_NAME} --strip-components=1
+
+########
+# Final
+########
+FROM ubuntu:24.04 AS final
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+  && apt-get install --no-install-recommends -y \
+      adduser \
+      ca-certificates \
+      python3 \
+      python3-pip \
+      locales \
+      sqlite3 \
+      wget \
+      curl \
+      tzdata \
+      libpq5 \
+      gettext \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* \
+  && locale-gen en_US.UTF-8 \
+  && deluser ubuntu \
+  && adduser wger --uid 1000 --disabled-password --gecos ""
+
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US:en
+ENV LC_ALL=en_US.UTF-8
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/home/wger/.local/bin:$PATH"
+ENV PYTHONPATH=/home/wger/src
+ENV DJANGO_SETTINGS_MODULE=settings.main
+
+WORKDIR /home/wger/src
+EXPOSE 8000
+
+# Copy app source and built assets
+COPY --chown=wger:wger . /home/wger/src
+COPY --chown=wger:wger --from=builder /root/src/node_modules /home/wger/src/node_modules
+COPY --chown=wger:wger --from=builder /root/src/wger/core/static/bootstrap-compiled.css /home/wger/src/wger/core/static/bootstrap-compiled.css
+COPY --chown=wger:wger --from=builder /root/src/wger/core/static/bootstrap-compiled.css.map /home/wger/src/wger/core/static/bootstrap-compiled.css.map
+
+# Install the entrypoint
+COPY --chown=wger:wger extras/docker/production/entrypoint.sh /home/wger/entrypoint.sh
+RUN chmod +x /home/wger/entrypoint.sh \
+  && chown wger:wger /home/wger/src
+
+USER wger
+
+# Install Python packages from pre-built wheels
+RUN --mount=type=bind,from=builder,source=/wheels,target=/wheels \
+    pip3 install --break-system-packages --no-cache-dir --user /wheels/* \
+  && pip3 install --break-system-packages --user . \
+  && mkdir -p ~/media ~/static ~/beat ~/db \
+  && cd wger \
+  && django-admin compilemessages
+
+CMD ["/home/wger/entrypoint.sh"]

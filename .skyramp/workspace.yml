@@ -1,47 +1,15 @@
-# Skyramp Workspace Configuration
-workspace:
-  repoName: mrugeshmaster/wger
-  repoUrl: https://github.com/mrugeshmaster/wger
-metadata:
-  schemaVersion: v1
-  executorVersion: v1.3.29
-  createdAt: "2026-06-25T19:06:51.168Z"
-  updatedAt: "2026-06-25T19:08:42.838Z"
 services:
-  - serviceName: wger-backend
+  - serviceName: wger-server
     language: python
     framework: pytest
     testDirectory: tests/skyramp
     api:
-      schemaPath: http://localhost/api/v2/schema
+      schemaPath: http://localhost:8091/api/v2/schema?format=json
       authType: token
       authHeader: Authorization
       authScheme: Token
-      baseUrl: http://localhost
+      baseUrl: http://localhost:8091
     runtimeDetails:
-      serverStartCommand: docker compose -f .skyramp/sut/docker-compose.testbot.yml up -d web
+      serverStartCommand: docker compose -p eval-25-wger up -d web
       runtime: docker
-      dockerNetwork: wger_testbot_network
-  - serviceName: wger-react-frontend
-    repository: mrugeshmaster/wger-react
-    language: typescript
-    framework: playwright
-    testDirectory: tests/skyramp
-    api:
-      authType: none
-      authHeader: ""
-      baseUrl: http://localhost:3000
-    runtimeDetails:
-      serverStartCommand: npm run start
-      runtime: local
-  - serviceName: wger-flutter-frontend
-    repository: mrugeshmaster/wger-flutter
-    language: javascript
-    framework: playwright
-    testDirectory: tests/skyramp
-    api:
-      authType: none
-      authHeader: ""
-      baseUrl: http://localhost:8080
-    runtimeDetails:
-      runtime: local
+      dockerNetwork: eval-25-wger_default
