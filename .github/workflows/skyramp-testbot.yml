@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   testbot:
+    # Only run for pull_request events or issue_comment on PRs mentioning @skyramp-testbot
     if: >-
       github.event_name == 'pull_request' ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@skyramp-testbot') && github.event.comment.user.login != 'skyramp-testbot[bot]')
@@ -20,22 +21,34 @@ jobs:
       contents: write
       pull-requests: write
       checks: write
+
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Generate GitHub App Token
+        id: skyramp-testbot-app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        with:
+          app-id: ${{ secrets.SKYRAMP_TESTBOT_APP_ID }}
+          private-key: ${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-          submodules: recursive
-      - uses: skyramp/testbot@15b35b4f7fc705aa12e96bb0aa65e238738ccdb7 # v0.11.7
+          token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
+          persist-credentials: false
+
+      - uses: skyramp/testbot@913801265aeb58bd5c64ef5f47ff27cd72e1a392 # v0.11.8
         with:
-          skyrampMcpVersion: "0.3.3"
-          skyrampExecutorVersion: "v1.3.39"
           skyrampLicenseFile: ${{ secrets.SKYRAMP_LICENSE_FILE }}
           anthropicApiKey: ${{ secrets.SKYRAMP_TESTBOT_API_KEY }}
+          githubToken: ${{ steps.skyramp-testbot-app-token.outputs.token }}
           githubAppId: ${{ secrets.SKYRAMP_TESTBOT_APP_ID }}
           githubAppPrivateKey: ${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}
-          targetSetupCommand: >-
-            docker compose -f $GITHUB_WORKSPACE/docker-compose.eval.yml -p wger-eval up -d --wait --wait-timeout 900
+          skyrampMcpVersion: '0.3.3'
+          skyrampExecutorVersion: 'v1.3.39'
+          githubAppId: '${{ secrets.SKYRAMP_TESTBOT_APP_ID }}'
+          githubAppPrivateKey: '${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}'
+          targetSetupCommand: 'docker compose -f $GITHUB_WORKSPACE/docker-compose.eval.yml -p wger-eval up -d --wait --wait-timeout 900'
           targetTeardownCommand: 'docker compose -f $GITHUB_WORKSPACE/docker-compose.eval.yml -p wger-eval down -v'
           authTokenCommand: 'bash $GITHUB_WORKSPACE/get-auth-token.sh'
-          authTokenRetries: "20"
-          authTokenRetryDelay: "15"
+          authTokenRetries: '20'
+          authTokenRetryDelay: '15'
