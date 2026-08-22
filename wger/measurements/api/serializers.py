@@ -41,6 +41,12 @@ class MeasurementSerializer(serializers.ModelSerializer):
     Measurement serializer
     """
 
+    category_name = serializers.SerializerMethodField()
+
+    def get_category_name(self, obj):
+        """Return the human-readable name of the measurement category."""
+        return obj.category.name
+
     # Manually set the serializer to set the coerce_to_string option
     value = serializers.DecimalField(
         max_digits=6,
@@ -55,6 +61,7 @@ class MeasurementSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'category',
+            'category_name',
             'date',
             'value',
             'notes',
