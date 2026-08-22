@@ -29,12 +29,13 @@ jobs:
         with:
           skyrampMcpVersion: "0.3.3"
           skyrampExecutorVersion: "v1.3.39"
+          maxGenerate: "5"
           skyrampLicenseFile: ${{ secrets.SKYRAMP_LICENSE_FILE }}
           anthropicApiKey: ${{ secrets.SKYRAMP_TESTBOT_API_KEY }}
           githubAppId: ${{ secrets.SKYRAMP_TESTBOT_APP_ID }}
           githubAppPrivateKey: ${{ secrets.SKYRAMP_TESTBOT_APP_PRIVATE_KEY }}
           targetSetupCommand: >-
-            docker compose -f $GITHUB_WORKSPACE/docker-compose.eval.yml -p wger-eval up -d --wait --wait-timeout 900
+            export REPO_PATH=$GITHUB_WORKSPACE && docker compose -f $GITHUB_WORKSPACE/docker-compose.eval.yml -p wger-eval up -d --wait --wait-timeout 900
           targetTeardownCommand: 'docker compose -f $GITHUB_WORKSPACE/docker-compose.eval.yml -p wger-eval down -v'
           authTokenCommand: 'bash $GITHUB_WORKSPACE/get-auth-token.sh'
           authTokenRetries: "20"
