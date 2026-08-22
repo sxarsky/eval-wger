@@ -21,6 +21,10 @@ from wger.weight.models import WeightEntry
 
 
 class WeightEntryFilterSet(filters.FilterSet):
+    # Optional filter: restrict entries to a specific calendar year.
+    # Omitting this parameter returns all entries (backward-compatible).
+    year = filters.NumberFilter(field_name='date', lookup_expr='year')
+
     class Meta:
         model = WeightEntry
         fields = {
