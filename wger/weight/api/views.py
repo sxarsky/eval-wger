@@ -16,7 +16,10 @@
 # along with Workout Manager.  If not, see <http://www.gnu.org/licenses/>.
 
 # Third Party
+from django.db.models import Avg, Count, Max, Min
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 # wger
 from wger.weight.api.filtersets import WeightEntryFilterSet
@@ -50,3 +53,20 @@ class WeightEntryViewSet(viewsets.ModelViewSet):
         Set the owner
         """
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        """
+        Returns aggregate statistics for the current user's weight entries.
+
+        Provides count, min, max, and average weight values across all entries
+        belonging to the authenticated user.
+        """
+        qs = self.get_queryset()
+        aggregates = qs.aggregate(
+            count=Count('id'),
+            min_weight=Min('weight'),
+            max_weight=Max('weight'),
+            avg_weight=Avg('weight'),
+        )
+        return Response(aggregates)
