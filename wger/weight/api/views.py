@@ -26,7 +26,11 @@ from wger.weight.models import WeightEntry
 
 class WeightEntryViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for nutrition plan objects
+    API endpoint for weight entry objects.
+
+    Allows authenticated users to create, read, update, and delete their own
+    weight entries. Results are scoped to the requesting user; entries belonging
+    to other users are never exposed.
     """
 
     serializer_class = WeightEntrySerializer
