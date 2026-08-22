@@ -62,12 +62,19 @@ class WgerOwnerObjectModelViewSet(viewsets.ModelViewSet):
     Custom viewset that makes sure the user can only create objects for himself
     """
 
-    def _check_owner_permission(self, request):
+    def _validate_request_payload(self, request) -> None:
+        """Raise ValidationError if request.data is not a plain mapping."""
         if not isinstance(request.data, dict):
             raise exceptions.ValidationError('Request data is not a dictionary')
 
+    def _assert_ownership(self, request) -> None:
+        """Raise PermissionDenied if any FK in the payload belongs to another user."""
         if not check_fk_ownership(request.data, self.get_owner_objects(), request.user.pk):
             raise exceptions.PermissionDenied('You are not allowed to do this')
+
+    def _check_owner_permission(self, request) -> None:
+        self._validate_request_payload(request)
+        self._assert_ownership(request)
 
     def create(self, request, *args, **kwargs):
         self._check_owner_permission(request)
