@@ -25,7 +25,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - uses: skyramp/testbot@15b35b4f7fc705aa12e96bb0aa65e238738ccdb7 # v0.11.7
+      - uses: skyramp/testbot@4722126f99847b5ef600de0a4b26e3349fa0eafe # v0.11.12
         with:
           skyrampMcpVersion: "0.3.3"
           skyrampExecutorVersion: "v1.3.39"
